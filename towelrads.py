@@ -4,8 +4,6 @@
 # This code is the reversed engineered infrared protocol used by the TowelRads remotes
 # which communicate with the smart timed thermostatic towel radiator elements.
 #
-# This encodes to/from the wacky "tuya stream" format used by UFO-R11 zigbee IR remote.
-#
 # Using this you can generate the codes you want to relay to your radiator to automate it.
 
 import tuya
@@ -16,6 +14,8 @@ from bisect import bisect
 from struct import pack, unpack
 from enum import IntEnum
 from pprint import pformat
+
+# 38khz clock
 
 # Epsilon value for accounting for variance in signal timings (in microseconds)
 PHASE_LENGTH_EPSILON = 250
@@ -32,13 +32,17 @@ LO_PHASE_LENGTH = 1000
 
 # Gap between each packet that is broadcast (in microseconds). A single message 
 # is made up of 9 packets.
-PACKET_INTERVAL_TIME = 30000
+#PACKET_INTERVAL_TIME = 30000
+PACKET_INTERVAL_TIME = 3000
 
 # How many packets of data are expected in each message.
 MESSAGE_PACKET_COUNT = 9
 
 # Expected length of a message transmitted over IR.
 MESSAGE_BYTE_LENGTH = 3 * MESSAGE_PACKET_COUNT
+
+# How many signal pulses are expected in a full message.
+MESSAGE_SIGNAL_LENGTH = 467
 
 # The different modes of operation the towel rail can be run in.
 class towelrads_mode(IntEnum):
@@ -82,7 +86,7 @@ class towelrads_message:
 
     # These values are the accumulated time since the remote was turned on, presumably
     # used for syncronising the time on the towel rad. As its cumulative you can get hours > 24.
-    # This will overflow roughly once every 10 days.
+    # I suspect hours > 24 also dictate the day of the week.
     time_hour = 0
     time_minute = 0
     time_second = 0
@@ -99,7 +103,7 @@ class towelrads_message:
     # WARNING: I have no idea if there are range safeties for this value, be careful you set it
     #          in the safe range the element was designed for.
     #
-    temperature = 50
+    temperature = 70
 
     # Unknown, appears to always be 0.
     unknown_0 = 0
@@ -186,7 +190,13 @@ def encode_towelrads(message):
 
     # Output each packet into signal timings.
     signal = []
+    first_packet = True
     for packet in packets:
+
+        # If following another packet, add a gap.
+        if (not first_packet):
+            signal.append(PACKET_INTERVAL_TIME)
+        first_packet = False
 
         # Packet headers
         signal.append(HEADER_PHASE_LENGTHS[0])
@@ -201,10 +211,13 @@ def encode_towelrads(message):
                 signal.append(HI_PHASE_LENGTH)
                 signal.append((LO_PHASE_LENGTH * 2) if bit_set else LO_PHASE_LENGTH)
 
-        # Gap between packets
-        signal.append(PACKET_INTERVAL_TIME)
+        # Ending hi phase
+        signal.append(HI_PHASE_LENGTH)
 
-    print(binary)
+    #print(binary)
+
+    if (len(signal) != MESSAGE_SIGNAL_LENGTH):
+        raise Exception("Encoding unexpected message signal length, got " + str(len(signal)) + " expected "+str(MESSAGE_SIGNAL_LENGTH))
 
     return signal
 
@@ -217,6 +230,9 @@ def decode_towelrads(input):
 
     bit_value = 0
     bit_index = 0
+
+    if (len(input) != MESSAGE_SIGNAL_LENGTH):
+        raise Exception("Decoding unexpected message signal length, got " + str(len(input)) + " expected "+str(MESSAGE_SIGNAL_LENGTH))
 
     #binary = "";
 
@@ -262,7 +278,7 @@ def decode_towelrads(input):
                         bit_index = 0
                         continue
                 else:
-                    raise "Unknown low signal timing, potentially corrupt: " + str(duration_us)
+                    raise Exception("Unknown low signal timing, potentially corrupt: " + str(duration_us))
             
                 # Append signal bit to the current byte and push into the signal output
                 # if we have read a full byte.
@@ -277,13 +293,13 @@ def decode_towelrads(input):
                     bit_index = 0
             else:
                 if (not equal_with_epsilon(duration_us, HI_PHASE_LENGTH)): 
-                    raise "Unknown high signal timing, potentially corrupt: " + str(duration_us)
+                    raise Exception("Unknown high signal timing, potentially corrupt: " + str(duration_us))
 
             signal_high = not signal_high
             
     # Ensure we have the expected message size.
     if (len(signal_values) != MESSAGE_BYTE_LENGTH):
-        raise "Message signal was unexpected size, expected " + str(MESSAGE_BYTE_LENGTH) + " but got " + str(len(signal_values))
+        raise Exception("Message signal was unexpected size, expected " + str(MESSAGE_BYTE_LENGTH) + " but got " + str(len(signal_values)))
 
     # Decode the decimal values into a message structure.
     message = towelrads_message()
@@ -330,25 +346,35 @@ signal3 = "B58nkA9hAuAD4DEDA8MHYQLgAz/AD+ADBwE6deAZZ8AvQEvAC8AHQBPgGwPgG2fgG0fgF
 #encoded_signal  = tuya.encode_ir(encoded_timings)    
 #print(encoded_signal)
 
+
+#print("=================== ON")
+#print(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC"))
+#on_message = towelrads_message()
+#on_message.mode = int(towelrads_mode.COMFORT)
+#on_message.temperature = 70
+#print(encode_towelrads(on_message))
+
 #print("===========================")
 
-on_message = towelrads_message()
-on_message.mode = int(towelrads_mode.COMFORT)
-on_message.temperature = 70
-print(encode_towelrads(on_message))
-print(tuya.encode_ir(encode_towelrads(on_message)))
+#print("=================== ON")
+#print(decode_towelrads(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC")))
+#print("=================== OFF")
+#print(decode_towelrads(decompress_ir_code("C0UovA9kAuAHZALuA+AFA0ATwAPAG+ADD0ALQBfAB8AL4AMPQBNAAwGCdoBnQAvgBwNAL0AD4AMXwA/AB+ADG+ATC+ATZ+ATN+AlGwGtAuDFZwBk4F7P4F9n4V+f4F7PAgNkAg==")))
 
-off_message = towelrads_message()
-off_message.mode = int(towelrads_mode.OFF)
-off_message.temperature = 70
-print(encode_towelrads(off_message))
-print(tuya.encode_ir(encode_towelrads(off_message)))
+#print("!!!! CUSTOM ON !!!!!");
+#on_message = towelrads_message()
+#on_message.mode = int(towelrads_mode.COMFORT)
+#on_message.temperature = 70
+#print(tuya.encode_ir(encode_towelrads(on_message)))
+#print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(on_message)))))
 
-#print("===================")
-#print(signal)
-#print(tuya.decode_ir(signal))
-#print(tuya.encode_ir(tuya.decode_ir(signal)))
-#print(tuya.decode_ir(tuya.encode_ir(tuya.decode_ir(signal))))
+#print("!!!! CUSTOM OFF !!!!!");
+#off_message = towelrads_message()
+#off_message.mode = int(towelrads_mode.OFF)
+#off_message.temperature = 70
+#print(tuya.encode_ir(encode_towelrads(off_message)))
+#print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(off_message)))))
+
 #print("===================")
 #print(signal2)
 #print(tuya.decode_ir(signal2))
@@ -359,3 +385,33 @@ print(tuya.encode_ir(encode_towelrads(off_message)))
 #print(tuya.decode_ir(signal3))
 #print(tuya.encode_ir(tuya.decode_ir(signal3)))
 #print(tuya.decode_ir(tuya.encode_ir(tuya.decode_ir(signal3))))
+
+print("!!!! CUSTOM ON !!!!!");
+on_message = towelrads_message()
+on_message.mode = int(towelrads_mode.COMFORT)
+on_message.temperature = 70
+print(tuya.encode_ir(encode_towelrads(on_message)))
+print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(on_message)))))
+
+print("!!!! CUSTOM OFF !!!!!");
+off_message = towelrads_message()
+off_message.mode = int(towelrads_mode.OFF)
+off_message.temperature = 70
+print(tuya.encode_ir(encode_towelrads(off_message)))
+print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(off_message)))))
+
+
+
+#print("Original IR Sensor")
+#print(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC"))
+
+#print("New IR Sensor")
+#print(decompress_ir_code("B0oouw9fAvQHoAMAA+ASB+ADG+ADC0A7QA9AA0ALQAPAC6AHAY52oGdAD+APA+AHN8AnQBdAA8AP4BIH4Bxn4BI/4B0bAbIC4IVnA7IC9APgH7vgDSfgXc/g/WfgKGcCA18C"))
+
+# Sent:
+# C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC
+#print(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC"))
+
+# Recv:
+# DEkYwB8ZAkEIZwIWBBkgA4AHBawEGQJBCMADgBMAFuAAE4APBkEIdgEWBGcgBwFnAkAHAhYEGSADAWcCQA9AA8BDQBMJ9XkWBC8BrAEcNEAPAqwBrGADAHYgBwgvAZ8FrAGsBKwgAwF2AcA3ChYEGQJBCBkCrAQvIBMBGQJADwYWBKwBrAR2IAMEnQCfBckgAwBnIBMbGQIBES8BrAR2AfV5rAQcNHYBrAQvAZ8FnQCVC0AfQA8AySALQAMEfACfBeqgAwCdIAcDZwKVC0AfQAMTfABJGMkA9XkvAQERSRgeVskAnwVAI0AbAy8BnwVADwEvAUALBBYEGQKsIAMDFgQvAUAHAawEQBtAJwkZAvV5fAAcNGcCQAsAFiAPAhYEZ2ADAawEQCsArCAvQCsAGSAPgC
+#print(decompress_ir_code("B3gC2Ad4AugD4AUDQBPAA8Ab4AMPQAtAF8AHQAtAA0APQAPAC0AHB1x2XCisD3gCQAvgDwPAM0AfwAvAB0AT4BsDAFzgGmfgG0fgFyPg/WfgJmcCA3gC"))
