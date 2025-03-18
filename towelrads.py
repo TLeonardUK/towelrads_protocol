@@ -134,26 +134,13 @@ def decode_schedule(a, b, c):
     
 # Decompresses a base64 / fastlz wrapped set of ir timings.
 def decompress_ir_code(input):
+    # TODO: We shouldn't need this library to decode - its just fastlz, which we can do ourselves.
     return tuya.decode_ir(input)
-#	payload = base64.decodebytes(input.encode('ascii'))
-#
-#	payload = pack('<I', len(payload) * 100) + payload
-#	payload = fastlz.decompress(payload)
- #   
-#	signal = []
-#	while payload:
-#		assert len(payload) >= 2, f'garbage in decompressed payload: {payload.hex()}'
-#		signal.append(unpack('<H', payload[:2])[0])
-#		payload = payload[2:]
-#
-#	return signal
 
 # Compresses a base64 / fastlz wrapped set of ir timings, which can be used directly with the UFO-R11
 def compress_ir_code(input):
+    # TODO: We shouldn't need this library to decode - its just fastlz, which we can do ourselves.
     return tuya.encode_ir(input, 0)
-#	payload = b''.join(pack('<H', t) for t in signal)
-#	out = fastlz.compress(payload, compression_level)
-#	return base64.encodebytes(payload).decode('ascii').replace('\n', '')
 
 # Converts a 24bit number into 3x 8 bit numbers
 def encode_schedule(input):
@@ -234,8 +221,6 @@ def decode_towelrads(input):
     if (len(input) != MESSAGE_SIGNAL_LENGTH):
         raise Exception("Decoding unexpected message signal length, got " + str(len(input)) + " expected "+str(MESSAGE_SIGNAL_LENGTH))
 
-    #binary = "";
-
     # The signal input is made up of durations between each phase change. So the even values are
     # always high-phase and odd values are low-phase.
     #
@@ -282,7 +267,6 @@ def decode_towelrads(input):
             
                 # Append signal bit to the current byte and push into the signal output
                 # if we have read a full byte.
-                #binary += ("1" if signal_bit else "0")
 
                 bit_value <<= 1
                 bit_value |= signal_bit
@@ -319,99 +303,4 @@ def decode_towelrads(input):
     message.schedule_saturday   = decode_schedule(signal_values[21], signal_values[22], signal_values[23])
     message.schedule_sunday     = decode_schedule(signal_values[24], signal_values[25], signal_values[26])
 
-    #print(binary)
-
     return message
-
-
-
-
-# Test a signal round trip
-
-
-signal = "B2covQ9dAvgD4A0DA+gHXQLgAxvgHw/gAydACwFZduAVZ0BjQCdAB0ADwAvAB0AT4BkDAasC4BtnAfgD4DkD4P1n4Pdn4l5vAgNdAg=="
-signal2 = "Bzoouw9mAuAHgAMB6wOAA8APwAfAF0AHQBNAB8AD4AcPQBdAE8ADQA8Bc3aAZ0AL4AcD4AMnwBtAE0ALwAdAC+AbA+ATZ+AbP+AfI+D9Z+D9Z+BYZwIDZgI="
-signal3 = "B58nkA9hAuAD4DEDA8MHYQLgAz/AD+ADBwE6deAZZ8AvQEvAC8AHQBPgGwPgG2fgG0fgFyPg/Wfg/WfgWGcCA2EC"
-#print(signal)
-
-#decoded_timings = decompress_ir_code(signal)    
-#print(decoded_timings)
-
-#decoded_message = decode_towelrads(decoded_timings)
-#print(decoded_message)
-
-#encoded_timings = encode_towelrads(decoded_message)
-#print(encoded_timings)
-
-#encoded_signal  = tuya.encode_ir(encoded_timings)    
-#print(encoded_signal)
-
-
-#print("=================== ON")
-#print(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC"))
-#on_message = towelrads_message()
-#on_message.mode = int(towelrads_mode.COMFORT)
-#on_message.temperature = 70
-#print(encode_towelrads(on_message))
-
-#print("===========================")
-
-#print("=================== ON")
-#print(decode_towelrads(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC")))
-#print("=================== OFF")
-#print(decode_towelrads(decompress_ir_code("C0UovA9kAuAHZALuA+AFA0ATwAPAG+ADD0ALQBfAB8AL4AMPQBNAAwGCdoBnQAvgBwNAL0AD4AMXwA/AB+ADG+ATC+ATZ+ATN+AlGwGtAuDFZwBk4F7P4F9n4V+f4F7PAgNkAg==")))
-
-#print("!!!! CUSTOM ON !!!!!");
-#on_message = towelrads_message()
-#on_message.mode = int(towelrads_mode.COMFORT)
-#on_message.temperature = 70
-#print(tuya.encode_ir(encode_towelrads(on_message)))
-#print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(on_message)))))
-
-#print("!!!! CUSTOM OFF !!!!!");
-#off_message = towelrads_message()
-#off_message.mode = int(towelrads_mode.OFF)
-#off_message.temperature = 70
-#print(tuya.encode_ir(encode_towelrads(off_message)))
-#print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(off_message)))))
-
-#print("===================")
-#print(signal2)
-#print(tuya.decode_ir(signal2))
-#print(tuya.encode_ir(tuya.decode_ir(signal2)))
-#print(tuya.decode_ir(tuya.encode_ir(tuya.decode_ir(signal2))))
-#print("===================")
-#print(signal3)
-#print(tuya.decode_ir(signal3))
-#print(tuya.encode_ir(tuya.decode_ir(signal3)))
-#print(tuya.decode_ir(tuya.encode_ir(tuya.decode_ir(signal3))))
-
-print("!!!! CUSTOM ON !!!!!");
-on_message = towelrads_message()
-on_message.mode = int(towelrads_mode.COMFORT)
-on_message.temperature = 70
-print(tuya.encode_ir(encode_towelrads(on_message)))
-print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(on_message)))))
-
-print("!!!! CUSTOM OFF !!!!!");
-off_message = towelrads_message()
-off_message.mode = int(towelrads_mode.OFF)
-off_message.temperature = 70
-print(tuya.encode_ir(encode_towelrads(off_message)))
-print(decode_towelrads(decompress_ir_code(tuya.encode_ir(encode_towelrads(off_message)))))
-
-
-
-#print("Original IR Sensor")
-#print(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC"))
-
-#print("New IR Sensor")
-#print(decompress_ir_code("B0oouw9fAvQHoAMAA+ASB+ADG+ADC0A7QA9AA0ALQAPAC6AHAY52oGdAD+APA+AHN8AnQBdAA8AP4BIH4Bxn4BI/4B0bAbIC4IVnA7IC9APgH7vgDSfgXc/g/WfgKGcCA18C"))
-
-# Sent:
-# C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC
-#print(decompress_ir_code("C0YowQ9lAuAHZQLsA+AFA0ATwAPAG+ADD0ALQBfAB0ALQANAD0ADwAsF7AOyAnZ2gGcB7APgEQPAM0AjwAvAB0AT4BkD4B1nAewD4DkDAXZ24BnP4P1n4ANn4V+f4F9nA2UCdnbiWgcCA2UC"))
-
-# Recv:
-# DEkYwB8ZAkEIZwIWBBkgA4AHBawEGQJBCMADgBMAFuAAE4APBkEIdgEWBGcgBwFnAkAHAhYEGSADAWcCQA9AA8BDQBMJ9XkWBC8BrAEcNEAPAqwBrGADAHYgBwgvAZ8FrAGsBKwgAwF2AcA3ChYEGQJBCBkCrAQvIBMBGQJADwYWBKwBrAR2IAMEnQCfBckgAwBnIBMbGQIBES8BrAR2AfV5rAQcNHYBrAQvAZ8FnQCVC0AfQA8AySALQAMEfACfBeqgAwCdIAcDZwKVC0AfQAMTfABJGMkA9XkvAQERSRgeVskAnwVAI0AbAy8BnwVADwEvAUALBBYEGQKsIAMDFgQvAUAHAawEQBtAJwkZAvV5fAAcNGcCQAsAFiAPAhYEZ2ADAawEQCsArCAvQCsAGSAPgC
-#print(decompress_ir_code("B3gC2Ad4AugD4AUDQBPAA8Ab4AMPQAtAF8AHQAtAA0APQAPAC0AHB1x2XCisD3gCQAvgDwPAM0AfwAvAB0AT4BsDAFzgGmfgG0fgFyPg/WfgJmcCA3gC"))
